@@ -2,19 +2,35 @@ from contextlib import AsyncExitStack
 from anyio import create_task_group, sleep
 from pydantic_ai.providers.google_gla import GoogleGLAProvider
 from pydantic_ai.models.gemini import GeminiModel
+from pydantic_ai.models.fallback import FallbackModel
 from pydantic_ai import Agent
 from pydantic_ai.mcp import MCPServerStdio
 from .config import settings
 
 def get_model():
-    return GeminiModel(
-        settings.MODEL_NAME, 
+
+    Gemini_2_0_flash = GeminiModel(
+        settings.MODEL_NAME_1, 
         provider=GoogleGLAProvider(api_key=settings.GEMINI_API_KEY)
     )
+    Gemini_2_5_pro = GeminiModel(
+        settings.MODEL_NAME_2, 
+        provider=GoogleGLAProvider(api_key=settings.GEMINI_API_KEY)
+    )
+    Gemini_2_0_flash_think = GeminiModel(
+        settings.MODEL_NAME_3, 
+        provider=GoogleGLAProvider(api_key=settings.GEMINI_API_KEY)
+    )
+
+    fallback_model = FallbackModel(Gemini_2_0_flash, Gemini_2_5_pro, Gemini_2_0_flash_think)
+
+    return fallback_model
+
 
 # Initialize MCP servers
 run_python = MCPServerStdio('npx', ['-y', '@pydantic/mcp-run-python', 'stdio'])
 airbnb = MCPServerStdio('npx', ['-y', '@openbnb/mcp-server-airbnb', '--ignore-robots-txt'])
+
 
 # Create agents
 run_python_agent = Agent(
@@ -49,6 +65,7 @@ async def use_airbnb_agent(query: str) -> dict[str, str]:
 
 
 async def start_mcp_servers():
+    """Starting MCP Servers"""
     async with AsyncExitStack() as stack:
         # Start servers with connection pooling
         await stack.enter_async_context(

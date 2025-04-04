@@ -14,7 +14,7 @@ import { toast } from "sonner";
 
 import { useLocalStorage, useWindowSize } from "usehooks-ts";
 
-import { cn } from "@/lib/utils";
+import { cn, Message } from "@/lib/utils";
 
 import { Button } from "./ui/button";
 import { Textarea } from "./ui/textarea";
@@ -42,7 +42,7 @@ export function MultimodalInput({
   messages,
   setMessages,
   // append,
-  // handleSubmit,
+  handleSubmit,
   className,
 }: {
   chatId: string;
@@ -50,18 +50,15 @@ export function MultimodalInput({
   setInput: (value: string) => void;
   isLoading: boolean;
   stop: () => void;
-  messages: Array<string>;
-  setMessages: Dispatch<SetStateAction<Array<string>>>;
+  messages: Message[];
+  setMessages: Dispatch<SetStateAction<Message[]>>;
   // append: (
   //   message: string | CreateMessage,
   //   chatRequestOptions?: ChatRequestOptions,
   // ) => Promise<string | null | undefined>;
-  // handleSubmit: (
-  //   event?: {
-  //     preventDefault?: () => void;
-  //   },
-  //   chatRequestOptions?: ChatRequestOptions,
-  // ) => void;
+  handleSubmit: (
+   input: string
+  ) => void;
   className?: string;
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -106,14 +103,14 @@ export function MultimodalInput({
     adjustHeight();
   };
 
-  // const submitForm = useCallback(() => {
-  //   handleSubmit(undefined, {});
-  //   setLocalStorageInput("");
+  const submitForm = useCallback(() => {
+    handleSubmit(input);
+    setLocalStorageInput("");
 
-  //   if (width && width > 768) {
-  //     textareaRef.current?.focus();
-  //   }
-  // }, [handleSubmit, setLocalStorageInput, width]);
+    if (width && width > 768) {
+      textareaRef.current?.focus();
+    }
+  }, [handleSubmit, setLocalStorageInput, width]);
 
   return (
     <div className="relative max-h-[calc(100vh-8vh)] w-full flex flex-col gap-4">
@@ -159,17 +156,17 @@ export function MultimodalInput({
         )}
         rows={3}
         autoFocus
-        // onKeyDown={(event) => {
-        //   if (event.key === "Enter" && !event.shiftKey) {
-        //     event.preventDefault();
+        onKeyDown={(event) => {
+          if (event.key === "Enter" && !event.shiftKey) {
+            event.preventDefault();
 
-        //     if (isLoading) {
-        //       toast.error("Please wait for the model to finish its response!");
-        //     } else {
-        //       submitForm();
-        //     }
-        //   }
-        // }}
+            if (isLoading) {
+              toast.error("Please wait for the model to finish its response!");
+            } else {
+              submitForm();
+            }
+          }
+        }}
       />
 
       {isLoading ? (
@@ -186,10 +183,10 @@ export function MultimodalInput({
       ) : (
         <Button
           className="rounded-full p-0.5 h-7 w-7 absolute bottom-2 right-2 border dark:border-zinc-600"
-          // onClick={(event) => {
-          //   event.preventDefault();
-          //   submitForm();
-          // }}
+          onClick={(event) => {
+            event.preventDefault();
+            submitForm();
+          }}
           disabled={input.length === 0}
         >
           <CircleArrowUp size={20} />

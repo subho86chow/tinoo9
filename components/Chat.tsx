@@ -1,21 +1,62 @@
 "use client"
 
 
-import React, { useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { useScrollToBottom } from './hooks/scrollToBottom';
-import { ThinkingMessage } from './Messages';
+import { PreviewMessage, ThinkingMessage } from './Messages';
 import { MultimodalInput } from './MultimodalInput';
+import { ClassDictionary } from 'clsx';
+
+interface Message {
+    role: string;
+    content: string;
+    tool_type?: string;
+  }
 
 function Chat() {
+    const [messagesContainerRef, messagesEndRef] = useScrollToBottom<HTMLDivElement>();
 
-    const [input,setInput] = useState("")
-    const [messages,setMessages] = useState<Array<string>>([])
-    const [messagesContainerRef, messagesEndRef] =
-    useScrollToBottom<HTMLDivElement>();
+    const [input, setInput] = useState("");
+    const [messages, setMessages] = useState<Message[]>([]);
+    const [loading,setLoading] = useState(false)
+    const wsRef = useRef<WebSocket | null>(null);
+    
+    useEffect(() => {
+      const ws = new WebSocket("ws://localhost:8000/ws");
+      wsRef.current = ws;
+    
+      ws.onmessage = (event) => {
+        setMessages((prev) => [...prev,JSON.parse(event.data)]);
 
+        console.log("Received:", JSON.parse(event.data).content);
 
-
-    const handleSubmit = () => {return null};
+        setLoading(false)
+        console.log(messages)
+      };
+    
+      return () => {
+        ws.close();
+      };
+    }, []);
+    
+    const sendMessage = (input: string) => {
+      if (wsRef.current?.readyState === WebSocket.OPEN) {
+        wsRef.current.send(input);
+        setLoading(true)
+      }
+    };
+    
+    const handleSubmit = () => {
+      if (input.trim() === "") return;
+      const obj = {
+        role: "user",
+        content: input,
+        tool_type: ""
+      };
+      setMessages(prev => [...prev, obj]);
+      sendMessage(input);
+      setInput("");
+    };
 
     return (
         <div className="flex flex-col min-w-0 h-[calc(100vh-11vh)] bg-background z-50">
@@ -23,21 +64,21 @@ function Chat() {
             ref={messagesContainerRef}
             className="flex flex-col min-w-0 gap-6 flex-1 overflow-y-scroll pt-4"
         >
-            {/* {messages.length === 0 && <Overview />}
+            {/* {messages.length === 0 && <Overview />} */}
 
             {messages.map((message:any, index:any) => (
             <PreviewMessage
                 key={message.id}
-                chatId={chatId}
                 message={message}
-                isLoading={isLoading && messages.length - 1 === index}
+                isLoading={loading && messages.length - 1 === index}
             />
             ))}
 
-            {isLoading &&
+            {loading &&
             messages.length > 0 &&
-            messages[messages.length - 1].role === "user" && <ThinkingMessage />} */}
-            <ThinkingMessage />
+            messages[messages.length - 1].role === "user" && <ThinkingMessage />}
+
+
             <div
             ref={messagesEndRef}
             className="shrink-0 min-w-[24px] min-h-[24px]"
@@ -53,6 +94,7 @@ function Chat() {
             stop={stop}
             messages={messages}
             setMessages={setMessages}
+            handleSubmit={handleSubmit}
             />
         </form>
         </div>

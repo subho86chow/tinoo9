@@ -1,20 +1,16 @@
 import asyncio
-from contextlib import asynccontextmanager, AsyncExitStack
-from fastapi import Depends, FastAPI, HTTPException
-from pydantic import BaseModel
-from typing import Dict, List, Optional
-
-from pydantic_ai import Agent
-
 import os
 from dotenv import load_dotenv
+import json
 
-from pydantic_ai.providers.google_gla import GoogleGLAProvider
-from pydantic_ai.models.gemini import GeminiModel
+from fastapi import Depends, FastAPI, WebSocket
+from pydantic_ai.models.gemini import ToolReturnPart
+from pydantic_ai import Agent
 
-from api.Config.dependencies import get_primary_agent
-from api.Config.schemas import ChatRequest
-from .Config.events import lifespan  # Import the event
+from api.config.dependencies import get_primary_agent
+from api.config.schemas import ChatRequest
+from api.config.events import lifespan
+from api.utils.utils import assign_tool_call
 
 load_dotenv()
 
@@ -42,6 +38,56 @@ async def chat_endpoint(request: ChatRequest, agent: Agent = Depends(get_primary
 def hello_fast_api():
     return {"message": "Hello from FastAPI"}
 
+
+# Modified WebSocket endpoint
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket, agent: Agent = Depends(get_primary_agent)):
+    await websocket.accept()
+    messages = []
+    
+    try:
+        while True:
+            try:
+                user_input = await asyncio.wait_for(
+                    websocket.receive_text(), 
+                    timeout=300  # 5 minute timeout
+                )
+                
+                if user_input.lower() in ['exit', 'quit']:
+                    await websocket.send_text("Goodbye!")
+                    break
+                
+                async with agent.run_stream(
+                    user_input, message_history=messages
+                ) as result:
+                    curr_message = ""
+                    async for message in result.stream_text(delta=True):
+                        curr_message += message
+                        try:
+
+                            tool_type = None
+
+                            tool_type = assign_tool_call(result.all_messages()[-2]) if len(result.all_messages()) > 2 else None
+    
+                            await websocket.send_json({
+                                "role": "system",
+                                "content": curr_message,
+                                "tool_type": tool_type
+                            })
+
+                        except ConnectionResetError:
+                            break  # Handle client disconnects
+                            
+                    messages = result.all_messages()
+                    
+            except asyncio.TimeoutError:
+                await websocket.send_text("Connection timeout, please refresh")
+                break
+                
+    except Exception as e:
+        await websocket.send_text(f"Error: {str(e)}")
+    finally:
+        await websocket.close()
 
 if __name__ == "__main__":
     import uvicorn
