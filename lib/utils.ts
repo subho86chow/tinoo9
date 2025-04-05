@@ -7,7 +7,16 @@ export function cn(...inputs: ClassValue[]) {
 
 
 export interface Message {
+  id: string
   role: string;
   content: string;
-  tool_type?: string;
+  tool_type?: string | null;
+}
+
+
+export interface ChatMessageRequest {
+    id: string
+    role: "user" | "system"
+    content: string
+    tool_type: string
 }

@@ -1,6 +1,15 @@
 import "./globals.css";
 import { Inter } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner"
+import {
+  ClerkProvider,
+  SignInButton,
+  SignUpButton,
+  SignedIn,
+  SignedOut,
+  UserButton,
+} from '@clerk/nextjs'
+import QueryProvider from "@/components/providers/QueryProvider";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -15,11 +24,24 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
+    <QueryProvider>
+    <ClerkProvider>
     <html lang="en">
+      {/* <header className="fixed top-0 p-4 gap-4 h-16">
+            <SignedOut>
+              <SignInButton />
+              <SignUpButton />
+            </SignedOut>
+            <SignedIn>
+              <UserButton />
+            </SignedIn>
+      </header> */}
       <body className={inter.className}>
         {children}
         <Toaster />
       </body>
     </html>
+    </ClerkProvider>
+    </QueryProvider>
   );
 }

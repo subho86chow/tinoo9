@@ -49,6 +49,7 @@ type Message = {
 
 export const PreviewMessage = ({
   message,
+  isLoading
 }: {
   message: Message;
   isLoading: boolean;
@@ -62,20 +63,28 @@ export const PreviewMessage = ({
     >
       <div
         className={cn(
-          "group-data-[role=user]/message:bg-primary group-data-[role=user]/message:text-primary-foreground flex items-center gap-1 group-data-[role=user]/message:px-3 w-full group-data-[role=user]/message:w-fit group-data-[role=user]/message:ml-auto group-data-[role=user]/message:max-w-2xl group-data-[role=user]/message:py-2 rounded-xl",
+          "group-data-[role=user]/message:bg-primary group-data-[role=user]/message:!text-secondary-foreground flex items-baseline gap-1 group-data-[role=user]/message:px-3 w-full group-data-[role=user]/message:w-fit group-data-[role=user]/message:ml-auto group-data-[role=user]/message:max-w-2xl group-data-[role=user]/message:py-2 rounded-xl",
         )}
       >
         {message.role === "system" && (
-          <div className="size-8 flex items-center rounded-full justify-center">
+          <div className="size-8 flex items-center rounded-full justify-center pt-0.5">
           <SparklesIcon size={14} />
         </div>
         )}
 
-        <div className="flex flex-col gap-2 w-full">
+        <div className="flex flex-col gap-2 w-full pl-2 p-1">
           {message.content && (
+          <div className="relative">
+            {/* <motion.div
+              className="w-[110%] h-full mx-auto max-w-4xl px-3 group/message absolute hover:bg-muted rounded-xl p-2 left-[-10%]"
+              initial={{ y: 5, opacity: 0 }}
+              animate={{ y: 0, opacity: 1, transition: { delay: 0.5 } }}
+              data-role={message.role}
+            ></motion.div> */}
             <div className="flex flex-col gap-4">
-              <Markdown>{message.content}</Markdown>
+              <Markdown isLoading={isLoading} dataRole={message.role}>{message.content}</Markdown>
             </div>
+          </div>
           )}
 
           {/* {message.toolInvocations && message.toolInvocations.length > 0 && (

@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
+const { redirect } = require('next/dist/server/api-utils');
 module.exports = {
   webpack: (config, { isServer }) => {
     if (!isServer) {

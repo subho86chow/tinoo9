@@ -5,33 +5,67 @@ import React, { useEffect, useRef, useState } from 'react'
 import { useScrollToBottom } from './hooks/scrollToBottom';
 import { PreviewMessage, ThinkingMessage } from './Messages';
 import { MultimodalInput } from './MultimodalInput';
-import { ClassDictionary } from 'clsx';
+import { useMutation } from '@tanstack/react-query';
+import SaveMessageToDB from "@/actions/saveMessage"
+import { ChatMessageRequest } from '@/lib/utils';
+import { toast } from 'sonner';
 
 interface Message {
+    id: string;
     role: string;
     content: string;
-    tool_type?: string;
+    tool_type?: string | null;
   }
 
-function Chat() {
+function Chat({chat}:{chat?:Message[]}) {
     const [messagesContainerRef, messagesEndRef] = useScrollToBottom<HTMLDivElement>();
 
     const [input, setInput] = useState("");
-    const [messages, setMessages] = useState<Message[]>([]);
+    const [chatId,serChatId] = useState("00112233")
+    const [messages, setMessages] = useState<Message[]>(chat? chat : []);
     const [loading,setLoading] = useState(false)
     const wsRef = useRef<WebSocket | null>(null);
+
+    const sendMessageMutation = useMutation({
+      mutationFn: SaveMessageToDB,
+      onSuccess: ()=>{},
+      onError: ()=>{},
+    })
+
     
     useEffect(() => {
       const ws = new WebSocket("ws://localhost:8000/ws");
       wsRef.current = ws;
     
       ws.onmessage = (event) => {
-        setMessages((prev) => [...prev,JSON.parse(event.data)]);
-
-        console.log("Received:", JSON.parse(event.data).content);
-
-        setLoading(false)
-        console.log(messages)
+        if (wsRef.current?.readyState === WebSocket.OPEN) {
+          try {
+            const data = JSON.parse(event.data);
+            serChatId(data.id)
+            setMessages((prev) => {
+              // If the last message is also from the system and we’re still streaming, update it
+              if (
+                prev.length > 0 &&
+                prev[prev.length - 1].role === "system" &&
+                data.role === "system"
+              ) {
+                const updatedMessages = [...prev];
+                updatedMessages[updatedMessages.length - 1] = {
+                  ...data,
+                };
+                return updatedMessages;
+              } else {
+                // First chunk of the system message or it's not a system message
+                return [...prev, data];
+              }
+            });
+            sendMessageMutation.mutate(data)
+            console.log("Received:", data);
+            setLoading(false);
+          } catch (err) {
+            console.warn("Non-JSON message:", event.data);
+          }
+        }
       };
     
       return () => {
@@ -39,9 +73,11 @@ function Chat() {
       };
     }, []);
     
-    const sendMessage = (input: string) => {
+    const sendMessage = (input: Message) => {
       if (wsRef.current?.readyState === WebSocket.OPEN) {
-        wsRef.current.send(input);
+        wsRef.current.send(input.content);
+        console.log("@@LAST_MESSAGE",input)
+        sendMessageMutation.mutate(input as ChatMessageRequest)
         setLoading(true)
       }
     };
@@ -49,12 +85,14 @@ function Chat() {
     const handleSubmit = () => {
       if (input.trim() === "") return;
       const obj = {
+        id: chatId,
         role: "user",
         content: input,
-        tool_type: ""
+        tool_type: null
       };
       setMessages(prev => [...prev, obj]);
-      sendMessage(input);
+      console.log(messages)
+      sendMessage(obj);
       setInput("");
     };
 
@@ -68,7 +106,7 @@ function Chat() {
 
             {messages.map((message:any, index:any) => (
             <PreviewMessage
-                key={message.id}
+                key={message.id + index}
                 message={message}
                 isLoading={loading && messages.length - 1 === index}
             />
@@ -87,7 +125,7 @@ function Chat() {
 
         <form className="flex mx-auto px-4 bg-background pb-4 md:pb-6 gap-2 w-full md:max-w-4xl">
             <MultimodalInput
-            chatId={"0001"}
+            chatId={chatId}
             input={input}
             setInput={setInput}
             isLoading={false}

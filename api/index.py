@@ -1,14 +1,16 @@
 import asyncio
+import json
 import os
 from dotenv import load_dotenv
-import json
+import uuid
 
 from fastapi import Depends, FastAPI, WebSocket
+from fastapi.responses import JSONResponse
 from pydantic_ai.models.gemini import ToolReturnPart
 from pydantic_ai import Agent
 
-from api.config.dependencies import get_primary_agent
-from api.config.schemas import ChatRequest
+from api.config.dependencies import get_primary_agent,get_header_generation_model
+from api.config.schemas import ChatHeaderRequest, ChatRequest
 from api.config.events import lifespan
 from api.utils.utils import assign_tool_call
 
@@ -34,6 +36,16 @@ async def chat_endpoint(request: ChatRequest, agent: Agent = Depends(get_primary
         return {"error": str(e)}
 
 
+@app.post("/api/getChatHeader")
+async def chatHeaderGenerator(request:ChatHeaderRequest, agent: Agent= Depends(get_header_generation_model)):
+    try:
+        data = [msg.model_dump() for msg in request.data]
+        result = await agent.run(json.dumps(data))
+        return JSONResponse(content={"data": result.data, "status": 200})
+    
+    except Exception as e:
+        return { "error": str(e) }
+
 @app.get("/api/helloFastApi")
 def hello_fast_api():
     return {"message": "Hello from FastAPI"}
@@ -44,7 +56,7 @@ def hello_fast_api():
 async def websocket_endpoint(websocket: WebSocket, agent: Agent = Depends(get_primary_agent)):
     await websocket.accept()
     messages = []
-    
+    message_id = uuid.uuid4()
     try:
         while True:
             try:
@@ -64,12 +76,12 @@ async def websocket_endpoint(websocket: WebSocket, agent: Agent = Depends(get_pr
                     async for message in result.stream_text(delta=True):
                         curr_message += message
                         try:
-
                             tool_type = None
 
                             tool_type = assign_tool_call(result.all_messages()[-2]) if len(result.all_messages()) > 2 else None
     
                             await websocket.send_json({
+                                "id": str(message_id),
                                 "role": "system",
                                 "content": curr_message,
                                 "tool_type": tool_type

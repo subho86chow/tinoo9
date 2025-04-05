@@ -45,6 +45,14 @@ airbnb_agent = Agent(
     mcp_servers=[airbnb]
 )
 
+header_update_model = Agent(
+    get_model(),
+    system_prompt="""You are a helpful AI assistant. Your job is to analyze a given chat conversation and return header.
+    Generate a short, catchy header that captures the main topic or purpose of the chat. The header must be no more than 5 words.
+    Be objective, clear, and focused on the main points of the conversation.
+    """
+)
+
 primary_agent = Agent(
     get_model(),
     system_prompt="Primary orchestration agent that delegates to subagents."
